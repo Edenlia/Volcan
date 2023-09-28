@@ -2,6 +2,7 @@
 
 uniform sampler2D texture;
 uniform sampler2D depthtex0;
+uniform sampler2D shadow;
 
 uniform float far;
 
@@ -10,28 +11,44 @@ uniform mat4 gbufferModelViewInverse;
 uniform mat4 gbufferProjection;
 uniform mat4 gbufferProjectionInverse;
 
-varying vec4 texcoord;
+uniform mat4 shadowModelView;
+uniform mat4 shadowModelViewInverse;
+uniform mat4 shadowProjection;
+uniform mat4 shadowProjectionInverse;
 
-/* DRAWBUFFERS: 0 */
+varying vec4 texcoord; // x,y is screen space coords, [0, 1]
+
+
+bool visible(vec4 worldPos) {
+    vec4 shadowPos = shadowProjection * shadowModelView * worldPos;
+    shadowPos /= shadowPos.w; // NDC
+
+    shadowPos = shadowPos * 0.5 + 0.5; // Screen space
+
+    float realDepth = shadowPos.z;
+    float shadowDepth = texture2D(shadow, shadowPos.xy).r;
+
+    if (realDepth - shadowDepth > 0.001) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+
 void main() {
     vec4 color = texture2D(texture, texcoord.st);
+    float screenSpaceDepth = texture2D(depthtex0, texcoord.st).r; // [0, 1]
 
-    // 获取当前像素深度
-    float depth = texture2D(depthtex0, texcoord.st).x;
+    vec4 screenSpaceCoord = vec4(texcoord.xy, screenSpaceDepth, 1.0);
+    vec4 ndcCoord = screenSpaceCoord * 2.0 - 1.0;
+    vec4 worldPos = gbufferModelViewInverse * gbufferProjectionInverse * ndcCoord;
 
-    // 利用深度缓冲建立带深度的ndc坐标
-    vec4 positionInNdcCoord = vec4(texcoord.st*2-1, depth*2-1, 1);
+    worldPos /= worldPos.w;
 
-    // 逆投影变换 -- ndc坐标转到裁剪坐标
-    vec4 positionInClipCoord = gbufferProjectionInverse * positionInNdcCoord;
-
-    // 透视除法 -- 裁剪坐标转到眼坐标
-    vec4 positionInViewCoord = vec4(positionInClipCoord.xyz/positionInClipCoord.w, 1.0);
-
-    // 逆 “视图模型” 变换 -- 眼坐标转 “我的世界坐标”
-    vec4 positionInWorldCoord = gbufferModelViewInverse * positionInViewCoord;
-
-    color.rgb *= positionInNdcCoord.x;
+    if (!visible(worldPos)) {
+        color *= 0.5;
+    }
 
     gl_FragData[0] = color;
 }
