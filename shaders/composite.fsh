@@ -18,6 +18,8 @@ uniform mat4 shadowProjectionInverse;
 
 varying vec4 texcoord; // x,y is screen space coords, [0, 1]
 
+#define EPSILON 5e-5
+
 
 bool visible(vec4 worldPos) {
     vec4 shadowPos = shadowProjection * shadowModelView * worldPos;
@@ -28,7 +30,12 @@ bool visible(vec4 worldPos) {
     float realDepth = shadowPos.z;
     float shadowDepth = texture2D(shadow, shadowPos.xy).r;
 
-    if (realDepth - shadowDepth > 0.001) {
+//    // too far away,
+//    if (shadowDepth > 0.999) {
+//        return false;
+//    }
+
+    if (realDepth - shadowDepth > EPSILON) {
         return false;
     } else {
         return true;
@@ -41,14 +48,18 @@ void main() {
     float screenSpaceDepth = texture2D(depthtex0, texcoord.st).r; // [0, 1]
 
     vec4 screenSpaceCoord = vec4(texcoord.xy, screenSpaceDepth, 1.0);
-    vec4 ndcCoord = screenSpaceCoord * 2.0 - 1.0;
-    vec4 worldPos = gbufferModelViewInverse * gbufferProjectionInverse * ndcCoord;
+    vec4 ndcPos = screenSpaceCoord * 2.0 - 1.0;
+    vec4 viewPos = gbufferProjectionInverse * ndcPos;
+    viewPos /= viewPos.w;
+    vec4 worldPos = gbufferModelViewInverse * viewPos;
 
     worldPos /= worldPos.w;
 
-    if (!visible(worldPos)) {
+    if (screenSpaceDepth < 1.0 && !visible(worldPos)) {
         color *= 0.5;
     }
+
+//    vec4 sh = texture2D(shadow, texcoord.st);
 
     gl_FragData[0] = color;
 }
