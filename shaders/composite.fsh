@@ -20,6 +20,9 @@ varying vec4 texcoord; // x,y is screen space coords, [0, 1]
 
 #define EPSILON 5e-5
 
+vec2 getFishEyeCoord(vec2 positionInNdcCoord) {
+    return positionInNdcCoord / (0.15 + 0.85*length(positionInNdcCoord.xy));
+}
 
 bool visible(vec4 worldPos) {
     vec4 shadowPos = shadowProjection * shadowModelView * worldPos;
@@ -28,6 +31,9 @@ bool visible(vec4 worldPos) {
     shadowPos = shadowPos * 0.5 + 0.5; // Screen space
 
     float realDepth = shadowPos.z;
+
+//    shadowPos.xy = getFishEyeCoord(shadowPos.xy);
+
     float shadowDepth = texture2D(shadow, shadowPos.xy).r;
 
 //    // too far away,
