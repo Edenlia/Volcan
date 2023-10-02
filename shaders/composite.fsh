@@ -1,5 +1,7 @@
 #version 120
 
+const int shadowMapResolution = 1024;
+
 uniform sampler2D texture;
 uniform sampler2D depthtex0;
 uniform sampler2D shadow;
@@ -24,15 +26,17 @@ vec2 getFishEyeCoord(vec2 positionInNdcCoord) {
     return positionInNdcCoord / (0.15 + 0.85*length(positionInNdcCoord.xy));
 }
 
-bool visible(vec4 worldPos) {
+float visibility(vec4 worldPos) {
     vec4 shadowPos = shadowProjection * shadowModelView * worldPos;
     shadowPos /= shadowPos.w; // NDC
+
+    shadowPos.xy = getFishEyeCoord(shadowPos.xy); // change to fish eye coord when in NDC
+
+    float a = 1 / shadowMapResolution;
 
     shadowPos = shadowPos * 0.5 + 0.5; // Screen space
 
     float realDepth = shadowPos.z;
-
-//    shadowPos.xy = getFishEyeCoord(shadowPos.xy);
 
     float shadowDepth = texture2D(shadow, shadowPos.xy).r;
 
@@ -42,9 +46,9 @@ bool visible(vec4 worldPos) {
 //    }
 
     if (realDepth - shadowDepth > EPSILON) {
-        return false;
+        return 0.5;
     } else {
-        return true;
+        return 1.0;
     }
 }
 
@@ -61,8 +65,8 @@ void main() {
 
     worldPos /= worldPos.w;
 
-    if (screenSpaceDepth < 1.0 && !visible(worldPos)) {
-        color *= 0.5;
+    if (screenSpaceDepth < 1.0) {
+        color *= visibility(worldPos);
     }
 
 //    vec4 sh = texture2D(shadow, texcoord.st);
