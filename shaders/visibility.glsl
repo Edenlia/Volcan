@@ -67,17 +67,18 @@ float visibility(vec4 worldPos,
 sampler2D shadowMap,
 vec3 shadowLightPos,
 mat4 shadowModelViewMatrix,
-mat4 shadowProjectionMatrix
+mat4 shadowProjectionMatrix,
+vec3 viewSpaceNormal
 ) {
     // compute cos between light direction and vertex normal in eye space
     // shadowLightPosition is in eye space, gl_Normal is vertex normal in
     // model space, so we need to transform it to eye space by gl_NormalMatrix
     // If cosLN is less than 0.0, then the vertex is facing away from the light
     // so we don't need to do shadow test
-    //    float cosLN = dot(normalize(shadowLightPosition), normalize(gl_NormalMatrix * gl_Normal));
-    //    if (cosLN < 0.0) {
-    //        return SHADOW_BRIGHTNESS;
-    //    }
+        float cosLN = dot(normalize(shadowLightPos), normalize(viewSpaceNormal));
+        if (cosLN < 0.0) {
+            return SHADOW_BRIGHTNESS;
+        }
 
     // from world space to light's clip space
     vec4 ndcPos = shadowProjectionMatrix * shadowModelViewMatrix * worldPos;

@@ -4,7 +4,7 @@
 #define PCF_FILTER_RADIUS (1.0 / 1024.0)
 
 const int shadowMapResolution = 2048; //Resolution of the shadow map. Higher numbers mean more accurate shadows. [128 256 512 1024 2048 4096 8192]
-//const float	sunPathRotation	= -40.0;
+const float	sunPathRotation	= 30.0;
 
 // distorts the shadow map, like fish eye lens.
 // this can increase the shadow map resolution in the center
