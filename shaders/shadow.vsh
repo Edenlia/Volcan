@@ -3,7 +3,7 @@
 varying vec4 texcoord;
 
 vec2 getFishEyeCoord(vec2 positionInNdcCoord) {
-    return positionInNdcCoord / (0.15 + 0.85*length(positionInNdcCoord.xy));
+    return positionInNdcCoord / (0.1 + length(positionInNdcCoord.xy));
 }
 
 void main() {
