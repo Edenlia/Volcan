@@ -26,10 +26,11 @@ varying vec4 worldPosition;
 void main() {
 	vec4 color = texture2D(texture, texcoord) * glcolor;
 	vec4 worldPos = worldPosition;
+	vec2 lm = lmcoord;
 
-	color.rgb *= visibility(worldPos, shadow, shadowLightPosition, shadowModelView, shadowProjection, viewNormal);
+	lm.y *= visibility(worldPos, shadow, shadowLightPosition, shadowModelView, shadowProjection, viewNormal);
 
-	color *= texture2D(lightmap, lmcoord);
+	color *= texture2D(lightmap, lm);
 
 /* DRAWBUFFERS:0 */
 	gl_FragData[0] = color; //gcolor
