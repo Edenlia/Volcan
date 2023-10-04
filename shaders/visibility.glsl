@@ -1,5 +1,59 @@
 #include "/shadow_util.glsl"
 
+#define PCF_FILTER_RADIUS (1.0 / 1024.0)
+#define NUM_SAMPLES 16
+#define NUM_RINGS 10
+
+highp float rand_1to1(highp float x) {
+    // -1 -1
+    return fract(sin(x) * 10000.0);
+}
+
+highp float rand_2to1(vec2 uv) {
+    // 0 - 1
+    const highp float a = 12.9898, b = 78.233, c = 43758.5453;
+    highp float dt = dot(uv.xy, vec2(a, b)), sn = mod(dt, PI);
+    return fract(sin(sn) * c);
+}
+
+vec2 poissonDisk[NUM_SAMPLES];
+
+void poissonDiskSamples(const in vec2 randomSeed) {
+
+    float ANGLE_STEP = PI2 * float(NUM_RINGS) / float(NUM_SAMPLES);
+    float INV_NUM_SAMPLES = 1.0 / float(NUM_SAMPLES);
+
+    float angle = rand_2to1(randomSeed) * PI2;
+    float radius = INV_NUM_SAMPLES;
+    float radiusStep = radius;
+
+    for (int i = 0; i < NUM_SAMPLES; i++) {
+        poissonDisk[i] = vec2(cos(angle), sin(angle)) * pow(radius, 0.75);
+        radius += radiusStep;
+        angle += ANGLE_STEP;
+    }
+}
+
+void uniformDiskSamples(const in vec2 randomSeed) {
+
+    float randNum = rand_2to1(randomSeed);
+    float sampleX = rand_1to1(randNum);
+    float sampleY = rand_1to1(sampleX);
+
+    float angle = sampleX * PI2;
+    float radius = sqrt(sampleY);
+
+    for (int i = 0; i < NUM_SAMPLES; i++) {
+        poissonDisk[i] = vec2(radius * cos(angle), radius * sin(angle));
+
+        sampleX = rand_1to1(sampleY);
+        sampleY = rand_1to1(sampleX);
+
+        angle = sampleX * PI2;
+        radius = sqrt(sampleY);
+    }
+}
+
 float calViewSpaceDepth(float ndcDepth, mat4 projectionInverse) {
     vec4 depth = vec4(0.0, 0.0, ndcDepth, 1.0);
     vec4 viewDepth = projectionInverse * depth;
@@ -19,8 +73,8 @@ float useShadowMap(sampler2D shadowMap, vec4 ndcPos, float viewObjDepth) {
     vec2 uv = shadowDistort(ndcPos.xy) * 0.5 + 0.5;
     float shadowMapDepth = texture2D(shadowMap, uv).r;
 
-    vec2 distortedUV = shadowDistort(ndcPos.xy);
-    float bias = computeBias(distortedUV);
+    vec2 distortedNDCXY = shadowDistort(ndcPos.xy);
+    float bias = computeBias(distortedNDCXY);
 
     // compute cos between light direction and vertex normal in eye space
     // shadowLightPosition is in eye space, gl_Normal is vertex normal in
@@ -37,32 +91,43 @@ float useShadowMap(sampler2D shadowMap, vec4 ndcPos, float viewObjDepth) {
 }
 
 float PCF(sampler2D shadowMap, vec4 ndcPos, float viewObjDepth) {
-    // PCF, because the shadow map is using fish eye coord,
-    // so we need to sample in clip space, a pixel distance
-    // in screen space is 1.0 / shadowMapResolution, so in
-    // clip space, it is 2.0 / shadowMapResolution, we use
-    // 1/4 a pixel distance
-    float pixelOffset = 0.5 / shadowMapResolution;
+    // Set random seed
+    vec2 uv = shadowDistort(ndcPos.xy) * 0.5 + 0.5;
+    poissonDiskSamples(uv);
+    
     float visible = 0.0;
-    int radius = 1;
+    float numSample = NUM_SAMPLES;
+    
+    for (int i = 0; i < NUM_SAMPLES; i++) {
+        vec2 offset = poissonDisk[i] * PCF_FILTER_RADIUS;
+        vec4 sampledPos = ndcPos + vec4(offset, 0, 0);
 
-    for (int i = -radius; i <= radius; i++) {
-        for (int j = -radius; j <= radius; j++) {
-            vec4 offset = vec4(i, j, 0, 0) * pixelOffset;
-            vec4 sampledPos = ndcPos + offset;
-            vec2 sampledUV = shadowDistort(sampledPos.xy) * 0.5 + 0.5;
+//        // If the sampled position is out of the screen, then exclude it
+//        if (sampledPos.x < -1.0 || sampledPos.x > 1.0 || sampledPos.y < -1.0 || sampledPos.y > 1.0) {
+//            numSample--;
+//            continue;
+//        }
 
-            vec2 distortedUV = shadowDistort(sampledPos.xy);
-            float bias = computeBias(distortedUV);
+        vec2 distortedNDCXY = shadowDistort(sampledPos.xy);
 
-            float shadowMapDepth = texture2D(shadowMap, sampledUV).r;
+        // If the sampled position is out of the screen, then exclude it
+        if (distortedNDCXY.x < -1.0 || distortedNDCXY.x > 1.0 || distortedNDCXY.y < -1.0 || distortedNDCXY.y > 1.0) {
+            numSample--;
+            continue;
+        }
 
-            if (viewObjDepth - shadowMapDepth <= bias) {
-                visible += 1.0;
-            }
+        vec2 sampledUV = distortedNDCXY * 0.5 + 0.5;
+
+        float bias = computeBias(distortedNDCXY);
+        
+        float shadowMapDepth = texture2D(shadowMap, sampledUV).r;
+        
+        if (viewObjDepth - shadowMapDepth <= bias) {
+            visible += 1.0;
         }
     }
-    visible /= pow(radius * 2 + 1, 2);
+
+    visible /= numSample;
 
     return (1 - SHADOW_BRIGHTNESS) * visible + SHADOW_BRIGHTNESS; // visibility is [SHAODW_STRENGTH, 1]
 }

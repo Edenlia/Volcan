@@ -1,8 +1,9 @@
 #define SHADOW_DISTORT_FACTOR 0.10 //Distortion factor for the shadow map. Has no effect when shadow distortion is disabled.
 #define SHADOW_BIAS 10.00 //Increase this if you get shadow acne. Decrease this if you get peter panning.
 #define SHADOW_BRIGHTNESS 0.5 // the visibility range [SHADOW_BRIGHTNESS, 1.0]
-#define PCF_FILTER_RADIUS (1.0 / 1024.0)
 #define LIGHT_RADIUS 0.1
+#define PI 3.141592653589793
+#define PI2 6.283185307179586
 
 const int shadowMapResolution = 2048; //Resolution of the shadow map. Higher numbers mean more accurate shadows. [128 256 512 1024 2048 4096 8192]
 const float	sunPathRotation	= 30.0;
