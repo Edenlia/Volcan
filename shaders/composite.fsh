@@ -25,8 +25,6 @@ varying vec2 texcoord; // x,y is screen space coords, [0, 1]
 
 #include "/visibility.glsl"
 
-#define EPSILON 5e-5
-
 void main() {
     vec4 color = texture2D(texture, texcoord);
 //    float screenSpaceDepth = texture2D(depthtex0, texcoord).r; // [0, 1]

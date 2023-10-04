@@ -30,7 +30,7 @@ void main() {
 	vec4 worldPos = worldPosition;
 	vec2 lm = lmcoord;
 
-	lm.y *= visibility(worldPos, shadow, shadowLightPosition, shadowModelView, shadowProjection, viewNormal);
+	lm.y *= visibility(worldPos, shadow, shadowLightPosition, shadowModelView, shadowProjection, shadowProjectionInverse, viewNormal);
 
 	color *= texture2D(lightmap, lm);
 
