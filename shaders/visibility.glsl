@@ -54,19 +54,22 @@ void uniformDiskSamples(const in vec2 randomSeed) {
     }
 }
 
-float calViewSpaceDepth(float ndcDepth, mat4 projectionInverse) {
-    vec4 depth = vec4(0.0, 0.0, ndcDepth, 1.0);
-    vec4 viewDepth = projectionInverse * depth;
-    viewDepth /= viewDepth.w;
-    return viewDepth.z;
+// View space's z is negative, need to get abs(viewPos.z)
+// and scale it to [0, 1]
+float calViewSpaceDepth(float ndcDepth, mat4 projectionInverse, float far, float near) {
+    vec4 ndcPos = vec4(0.0, 0.0, ndcDepth, 1.0);
+    vec4 viewPos = projectionInverse * ndcPos;
+    viewPos /= viewPos.w;
+    float viewSpaceDepth = abs(viewPos.z);
+    return (viewSpaceDepth - near) / (far - near);
 }
 
-// Params are in view space
+// Params are in view space, linear depth
 float calPenumbraSize(float objDepth, float blockerDepth) {
     return (objDepth - blockerDepth) / blockerDepth;
 }
 
-float useShadowMap(sampler2D shadowMap, vec4 ndcPos, float viewObjDepth) {
+float useShadowMap(sampler2D shadowMap, vec4 ndcPos, float objDepth) {
     // The fish eye function applied in ndc space, so we need to
     // change the ndcPos to fish eye coord first and then change
     // the range from [-1, 1] to [0, 1]
@@ -83,14 +86,14 @@ float useShadowMap(sampler2D shadowMap, vec4 ndcPos, float viewObjDepth) {
     //    float diff = dot(normalize(shadowLightPosition), normalize(gl_NormalMatrix * gl_Normal));
     //    bias /= diff;
 
-    if (viewObjDepth - shadowMapDepth <= bias) {
+    if (objDepth - shadowMapDepth <= bias) {
         return 1.0;
     } else {
         return SHADOW_BRIGHTNESS;
     }
 }
 
-float PCF(sampler2D shadowMap, vec4 ndcPos, float viewObjDepth) {
+float PCF(sampler2D shadowMap, vec4 ndcPos, float objDepth) {
     // Set random seed
     vec2 uv = shadowDistort(ndcPos.xy) * 0.5 + 0.5;
     poissonDiskSamples(uv);
@@ -102,19 +105,13 @@ float PCF(sampler2D shadowMap, vec4 ndcPos, float viewObjDepth) {
         vec2 offset = poissonDisk[i] * PCF_FILTER_RADIUS;
         vec4 sampledPos = ndcPos + vec4(offset, 0, 0);
 
-//        // If the sampled position is out of the screen, then exclude it
-//        if (sampledPos.x < -1.0 || sampledPos.x > 1.0 || sampledPos.y < -1.0 || sampledPos.y > 1.0) {
-//            numSample--;
-//            continue;
-//        }
-
-        vec2 distortedNDCXY = shadowDistort(sampledPos.xy);
-
         // If the sampled position is out of the screen, then exclude it
-        if (distortedNDCXY.x < -1.0 || distortedNDCXY.x > 1.0 || distortedNDCXY.y < -1.0 || distortedNDCXY.y > 1.0) {
+        if (sampledPos.x < -1.0 || sampledPos.x > 1.0 || sampledPos.y < -1.0 || sampledPos.y > 1.0) {
             numSample--;
             continue;
         }
+
+        vec2 distortedNDCXY = shadowDistort(sampledPos.xy);
 
         vec2 sampledUV = distortedNDCXY * 0.5 + 0.5;
 
@@ -122,7 +119,7 @@ float PCF(sampler2D shadowMap, vec4 ndcPos, float viewObjDepth) {
         
         float shadowMapDepth = texture2D(shadowMap, sampledUV).r;
         
-        if (viewObjDepth - shadowMapDepth <= bias) {
+        if (objDepth - shadowMapDepth <= bias) {
             visible += 1.0;
         }
     }
@@ -132,30 +129,38 @@ float PCF(sampler2D shadowMap, vec4 ndcPos, float viewObjDepth) {
     return (1 - SHADOW_BRIGHTNESS) * visible + SHADOW_BRIGHTNESS; // visibility is [SHAODW_STRENGTH, 1]
 }
 
-float findBlocker(sampler2D shadowMap, vec4 ndcPos, float objDepth, mat4 shadowProjectionInverseMatrix) {
+float findBlocker(sampler2D shadowMap, vec4 ndcPos, float viewSpaceDepth, mat4 shadowProjectionInverseMatrix, float far, float near) {
     // find the blocker, using view space depth because the
     // ndc space depth is not linear
-    float viewSpaceDepth = calViewSpaceDepth(ndcPos.z, shadowProjectionInverseMatrix);
-
-    float pixelOffset = 0.5 / shadowMapResolution;
     int blockerNum = 0;
     float blockerDepthSum = 0.0;
 
-    int radius = 5;
+    float numSample = NUM_SAMPLES;
+    float blockSearchRadius = 2.0 / 1024.0;
 
-    for (int i = -radius; i <= radius; i++) {
-        for (int j = -radius; j <= radius; j++) {
-            vec4 offset = vec4(i, j, 0, 0) * pixelOffset;
-            vec4 sampledPos = ndcPos + offset;
-            vec2 sampledUV = shadowDistort(sampledPos.xy) * 0.5 + 0.5;
+    for (int i = 0; i < NUM_SAMPLES; i++) {
+        vec2 offset = poissonDisk[i] * blockSearchRadius;
+        vec4 sampledPos = ndcPos + vec4(offset, 0, 0);
 
-            float shadowMapDepth = texture2D(shadowMap, sampledUV).r;
-            float shadowMapViewSpaceDepth = calViewSpaceDepth(shadowMapDepth, shadowProjectionInverseMatrix);
+        // If the sampled position is out of the screen, then exclude it
+        if (sampledPos.x < -1.0 || sampledPos.x > 1.0 || sampledPos.y < -1.0 || sampledPos.y > 1.0) {
+            numSample--;
+            continue;
+        }
 
-            if (shadowMapViewSpaceDepth < viewSpaceDepth) {
-                blockerNum++;
-                blockerDepthSum += shadowMapViewSpaceDepth;
-            }
+        vec2 distortedNDCXY = shadowDistort(sampledPos.xy);
+
+        vec2 sampledUV = distortedNDCXY * 0.5 + 0.5;
+
+        float bias = computeBias(distortedNDCXY);
+
+        float shadowMapDepth = texture2D(shadowMap, sampledUV).r;
+        float shadowMapNDCDepth = shadowMapDepth * 2.0 - 1.0;
+        float shadowMapViewSpaceDepth = calViewSpaceDepth(shadowMapNDCDepth, shadowProjectionInverseMatrix, far, near);
+
+        if (shadowMapViewSpaceDepth - viewSpaceDepth < 0.0) {
+            blockerNum++;
+            blockerDepthSum += shadowMapViewSpaceDepth;
         }
     }
 
@@ -167,37 +172,67 @@ float findBlocker(sampler2D shadowMap, vec4 ndcPos, float objDepth, mat4 shadowP
 }
 
 
-float PCSS(sampler2D shadowMap, vec4 ndcPos, float objDepth, mat4 shadowProjectionInverseMatrix) {
+float PCSS(sampler2D shadowMap,
+vec4 ndcPos,
+float objDepth,
+mat4 shadowProjectionInverseMatrix,
+float far,
+float near) {
+    // Set random seed
+    vec2 uv = shadowDistort(ndcPos.xy) * 0.5 + 0.5;
+    poissonDiskSamples(uv);
+
     // STEP 1: blocker search
-    float blockerDepth = findBlocker(shadowMap, ndcPos, objDepth, shadowProjectionInverseMatrix);
+    float viewSpaceDepth = calViewSpaceDepth(ndcPos.z, shadowProjectionInverseMatrix, far, near);
+    float blockerDepth = findBlocker(shadowMap, ndcPos, viewSpaceDepth, shadowProjectionInverseMatrix, far, near);
     if (blockerDepth == -1) {
         return 1.0;
     }
 
     // STEP 2: penumbra size
-    float viewSpaceDepth = calViewSpaceDepth(ndcPos.z, shadowProjectionInverseMatrix);
     float penumbraRatio = calPenumbraSize(viewSpaceDepth, blockerDepth);
     float radius = LIGHT_RADIUS * penumbraRatio;
 
+//    if (blockerDepth < viewSpaceDepth) {
+//        return 1.0;
+//    } else {
+//        return 0.0;
+//    }
+
     // STEP 3: PCF filtering
     float visible = 0.0;
-    int sampleNum = 1;
-    float pixelOffset = 0.5 / shadowMapResolution;
-    for (int i = -sampleNum; i <= sampleNum; i++) {
-        for (int j = -sampleNum; j <= sampleNum; j++) {
-            vec4 offset = vec4(i, j, 0, 0) * pixelOffset * radius;
-            vec4 sampledPos = ndcPos + offset;
-            vec2 sampledUV = shadowDistort(sampledPos.xy) * 0.5 + 0.5;
+    float numSample = NUM_SAMPLES;
 
-            float shadowMapDepth = texture2D(shadowMap, sampledUV).r;
+    for (int i = 0; i < NUM_SAMPLES; i++) {
+        vec2 offset = poissonDisk[i] * radius;
+        vec4 sampledPos = ndcPos + vec4(offset, 0, 0);
 
-            if (objDepth - shadowMapDepth <= 5e-5) {
-                visible += 1.0;
-            }
+        // If the sampled position is out of the screen, then exclude it
+        if (sampledPos.x < -1.0 || sampledPos.x > 1.0 || sampledPos.y < -1.0 || sampledPos.y > 1.0) {
+            numSample--;
+            continue;
+        }
+
+        vec2 distortedNDCXY = shadowDistort(sampledPos.xy);
+
+        vec2 sampledUV = distortedNDCXY * 0.5 + 0.5;
+
+        float bias = computeBias(distortedNDCXY);
+
+        float shadowMapDepth = texture2D(shadowMap, sampledUV).r;
+
+        if (objDepth - shadowMapDepth <= bias) {
+            visible += 1.0;
         }
     }
 
-    visible /= pow(sampleNum * 2 + 1, 2);
+    visible /= numSample;
+
+//    if (visible != 1.0 && visible != 0.0) {
+//        return 1.0;
+//    } else {
+//        return 0.0;
+//    }
 
     return (1 - SHADOW_BRIGHTNESS) * visible + SHADOW_BRIGHTNESS; // visibility is [SHAODW_STRENGTH, 1]
 }
@@ -211,25 +246,28 @@ vec3 shadowLightPos,
 mat4 shadowModelViewMatrix,
 mat4 shadowProjectionMatrix,
 mat4 shadowProjectionInverseMatrix,
-vec3 viewSpaceNormal
+vec3 viewSpaceNormal,
+float far,
+float near
 ) {
     // compute cos between light direction and vertex normal in eye space
     // shadowLightPosition is in eye space, gl_Normal is vertex normal in
     // model space, so we need to transform it to eye space by gl_NormalMatrix
     // If cosLN is less than 0.0, then the vertex is facing away from the light
     // so we don't need to do shadow test
-        float cosLN = dot(normalize(shadowLightPos), normalize(viewSpaceNormal));
-        if (cosLN < 0.0) {
-            return SHADOW_BRIGHTNESS;
-        }
+    float cosLN = dot(normalize(shadowLightPos), normalize(viewSpaceNormal));
+    if (cosLN < 0.0) {
+        return SHADOW_BRIGHTNESS;
+    }
 
     // from world space to light's clip space
-    vec4 ndcPos = shadowProjectionMatrix * shadowModelViewMatrix * worldPos;
+    vec4 viewPos = shadowModelViewMatrix * worldPos;
+    vec4 ndcPos = shadowProjectionMatrix * viewPos;
     ndcPos /= ndcPos.w;
 
-    float viewObjDepth = ndcPos.z * 0.5 + 0.5;
+    float objDepth = ndcPos.z * 0.5 + 0.5;
 
-    return useShadowMap(shadowMap, ndcPos, viewObjDepth);
-//    return PCF(shadowMap, ndcPos, viewObjDepth);
-//    return PCSS(shadowMap, ndcPos, viewObjDepth, shadowProjectionInverseMatrix);
+//    return useShadowMap(shadowMap, ndcPos, objDepth);
+//    return PCF(shadowMap, ndcPos, objDepth);
+    return PCSS(shadowMap, ndcPos, objDepth, shadowProjectionInverseMatrix, far, near);
 }

@@ -15,6 +15,9 @@ uniform mat4 shadowProjection;
 uniform mat4 shadowProjectionInverse;
 uniform vec3 shadowLightPosition; // shadow light (sun or moon) position in eye space
 
+uniform float far; // around 225
+uniform float near;
+
 varying vec2 lmcoord;
 varying vec2 texcoord;
 varying vec4 glcolor;
@@ -28,7 +31,7 @@ void main() {
 	vec4 worldPos = worldPosition;
 	vec2 lm = lmcoord;
 
-	lm.y *= visibility(worldPos, shadow, shadowLightPosition, shadowModelView, shadowProjection, shadowProjectionInverse, viewNormal);
+	lm.y *= visibility(worldPos, shadow, shadowLightPosition, shadowModelView, shadowProjection, shadowProjectionInverse, viewNormal, far, near);
 
 	color *= texture2D(lightmap, lm);
 
