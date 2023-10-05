@@ -25,19 +25,32 @@ vec2 shadowDistort(vec2 positionInNdcCoord) {
 // bigger or smaller a pixel gets as a result of applying distortion.
 // param is the distorted from ndc coord, range [-1, 1]
 // TODO: change bias to erase center artifacts
-float computeBias(vec2 distortedUV) {
+float computeBias(vec2 distortedUV, vec3 lightDir, vec3 normal) {
     //square(length(pos.xy) + SHADOW_DISTORT_FACTOR)
     float numerator = length(distortedUV) + SHADOW_DISTORT_FACTOR;
     numerator *= numerator;
-    return SHADOW_BIAS / shadowMapResolution * numerator / SHADOW_DISTORT_FACTOR;
+
+    float bias = SHADOW_BIAS / shadowMapResolution * numerator / SHADOW_DISTORT_FACTOR;
+
+    // divide by sin(wi, n)
+    // bias increase as the angle between light and normal increases
+    bias /= length(cross(normal, lightDir));
+
+    return bias;
 }
 #else
 vec2 shadowDistort(vec2 positionInNdcCoord) {
     return positionInNdcCoord;
 }
 
-float computeBias(vec2 distortedUV) {
-    return SHADOW_BIAS / shadowMapResolution;
+float computeBias(vec2 distortedUV, vec3 lightDir, vec3 normal) {
+    float bias = SHADOW_BIAS / shadowMapResolution;
+
+    // divide by sin(wi, n)
+    // bias increase as the angle between light and normal increases
+    bias /= length(cross(normal, lightDir));
+
+    return bias;
 }
 
 #endif

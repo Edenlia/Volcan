@@ -69,7 +69,7 @@ float calPenumbraSize(float objDepth, float blockerDepth) {
     return (objDepth - blockerDepth) / blockerDepth;
 }
 
-float useShadowMap(sampler2D shadowMap, vec4 ndcPos, float objDepth) {
+float useShadowMap(sampler2D shadowMap, vec4 ndcPos, float objDepth, vec3 lightDir, vec3 normal) {
     // The fish eye function applied in ndc space, so we need to
     // change the ndcPos to fish eye coord first and then change
     // the range from [-1, 1] to [0, 1]
@@ -77,7 +77,7 @@ float useShadowMap(sampler2D shadowMap, vec4 ndcPos, float objDepth) {
     float shadowMapDepth = texture2D(shadowMap, uv).r;
 
     vec2 distortedNDCXY = shadowDistort(ndcPos.xy);
-    float bias = computeBias(distortedNDCXY);
+    float bias = computeBias(distortedNDCXY, lightDir, normal);
 
     // compute cos between light direction and vertex normal in eye space
     // shadowLightPosition is in eye space, gl_Normal is vertex normal in
@@ -93,7 +93,7 @@ float useShadowMap(sampler2D shadowMap, vec4 ndcPos, float objDepth) {
     }
 }
 
-float PCF(sampler2D shadowMap, vec4 ndcPos, float objDepth) {
+float PCF(sampler2D shadowMap, vec4 ndcPos, float objDepth, vec3 lightDir, vec3 normal) {
     // Set random seed
     vec2 uv = shadowDistort(ndcPos.xy) * 0.5 + 0.5;
     poissonDiskSamples(uv);
@@ -115,7 +115,7 @@ float PCF(sampler2D shadowMap, vec4 ndcPos, float objDepth) {
 
         vec2 sampledUV = distortedNDCXY * 0.5 + 0.5;
 
-        float bias = computeBias(distortedNDCXY);
+        float bias = computeBias(distortedNDCXY, lightDir, normal);
         
         float shadowMapDepth = texture2D(shadowMap, sampledUV).r;
         
@@ -129,7 +129,15 @@ float PCF(sampler2D shadowMap, vec4 ndcPos, float objDepth) {
     return (1 - SHADOW_BRIGHTNESS) * visible + SHADOW_BRIGHTNESS; // visibility is [SHAODW_STRENGTH, 1]
 }
 
-float findBlocker(sampler2D shadowMap, vec4 ndcPos, float viewSpaceDepth, mat4 shadowProjectionInverseMatrix, float far, float near) {
+float findBlocker(
+        sampler2D shadowMap,
+        vec4 ndcPos,
+        float viewSpaceDepth,
+        mat4 shadowProjectionInverseMatrix,
+        float far,
+        float near,
+        vec3 lightDir,
+        vec3 normal) {
     // find the blocker, using view space depth because the
     // ndc space depth is not linear
     int blockerNum = 0;
@@ -152,7 +160,7 @@ float findBlocker(sampler2D shadowMap, vec4 ndcPos, float viewSpaceDepth, mat4 s
 
         vec2 sampledUV = distortedNDCXY * 0.5 + 0.5;
 
-        float bias = computeBias(distortedNDCXY);
+        float bias = computeBias(distortedNDCXY, lightDir, normal);
 
         float shadowMapDepth = texture2D(shadowMap, sampledUV).r;
         float shadowMapNDCDepth = shadowMapDepth * 2.0 - 1.0;
@@ -172,19 +180,23 @@ float findBlocker(sampler2D shadowMap, vec4 ndcPos, float viewSpaceDepth, mat4 s
 }
 
 
-float PCSS(sampler2D shadowMap,
-vec4 ndcPos,
-float objDepth,
-mat4 shadowProjectionInverseMatrix,
-float far,
-float near) {
+float PCSS(
+        sampler2D shadowMap,
+        vec4 ndcPos,
+        float objDepth,
+        mat4 shadowProjectionInverseMatrix,
+        float far,
+        float near,
+        vec3 lightDir,
+        vec3 normal) {
     // Set random seed
     vec2 uv = shadowDistort(ndcPos.xy) * 0.5 + 0.5;
     poissonDiskSamples(uv);
 
     // STEP 1: blocker search
+    // TODO: use light's frustum to determine the block search radius
     float viewSpaceDepth = calViewSpaceDepth(ndcPos.z, shadowProjectionInverseMatrix, far, near);
-    float blockerDepth = findBlocker(shadowMap, ndcPos, viewSpaceDepth, shadowProjectionInverseMatrix, far, near);
+    float blockerDepth = findBlocker(shadowMap, ndcPos, viewSpaceDepth, shadowProjectionInverseMatrix, far, near, lightDir, normal);
     if (blockerDepth == -1) {
         return 1.0;
     }
@@ -217,7 +229,7 @@ float near) {
 
         vec2 sampledUV = distortedNDCXY * 0.5 + 0.5;
 
-        float bias = computeBias(distortedNDCXY);
+        float bias = computeBias(distortedNDCXY, lightDir, normal);
 
         float shadowMapDepth = texture2D(shadowMap, sampledUV).r;
 
@@ -255,7 +267,9 @@ float near
     // model space, so we need to transform it to eye space by gl_NormalMatrix
     // If cosLN is less than 0.0, then the vertex is facing away from the light
     // so we don't need to do shadow test
-    float cosLN = dot(normalize(shadowLightPos), normalize(viewSpaceNormal));
+    vec3 lightDir = normalize(shadowLightPos);
+    vec3 normal = normalize(viewSpaceNormal);
+    float cosLN = dot(lightDir, normal);
     if (cosLN < 0.0) {
         return SHADOW_BRIGHTNESS;
     }
@@ -267,7 +281,7 @@ float near
 
     float objDepth = ndcPos.z * 0.5 + 0.5;
 
-//    return useShadowMap(shadowMap, ndcPos, objDepth);
-//    return PCF(shadowMap, ndcPos, objDepth);
-    return PCSS(shadowMap, ndcPos, objDepth, shadowProjectionInverseMatrix, far, near);
+//    return useShadowMap(shadowMap, ndcPos, objDepth, lightDir, normal);
+//    return PCF(shadowMap, ndcPos, objDepth, lightDir, normal);
+    return PCSS(shadowMap, ndcPos, objDepth, shadowProjectionInverseMatrix, far, near, lightDir, normal);
 }
