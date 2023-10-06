@@ -7,44 +7,40 @@ uniform sampler2D depthtex0;
 uniform sampler2D shadow;
 uniform sampler2D gcolor;
 
-uniform float far;
-
-uniform mat4 gbufferModelView;
-uniform mat4 gbufferModelViewInverse;
-uniform mat4 gbufferProjection;
-uniform mat4 gbufferProjectionInverse;
-
-uniform mat4 shadowModelView;
-uniform mat4 shadowModelViewInverse;
-uniform mat4 shadowProjection;
-uniform mat4 shadowProjectionInverse;
-
-uniform vec3 shadowLightPosition; // shadow light (sun or moon) position in eye space
+uniform float viewWidth;    // screen width in pixels
+uniform float viewHeight;   // screen height in pixels
 
 varying vec2 texcoord; // x,y is screen space coords, [0, 1]
 
 #include "/visibility.glsl"
 
+vec4 getBloomOriginColor(vec4 color) {
+    // grey value
+    float brightness = 0.299*color.r + 0.587*color.g + 0.114*color.b;
+    if(brightness < 0.5) {
+        color.rgb = vec3(0);
+    }
+    return color;
+}
+
+vec3 blooming(vec2 texcoord, int radius) {
+    vec3 sum = vec3(0);
+
+    for(int i=-radius; i<=radius; i++) {
+        for(int j=-radius; j<=radius; j++) {
+            vec2 offset = vec2(i/viewWidth, j/viewHeight);
+            sum += getBloomOriginColor(texture2D(texture, texcoord.st+offset)).rgb;
+        }
+    }
+
+    sum /= pow(radius+1, 2);
+    return sum*0.3;
+}
+
 void main() {
     vec4 color = texture2D(texture, texcoord);
-//    float screenSpaceDepth = texture2D(depthtex0, texcoord).r; // [0, 1]
-//
-//    vec4 screenSpaceCoord = vec4(texcoord, screenSpaceDepth, 1.0);
-//    vec4 ndcPos = screenSpaceCoord * 2.0 - 1.0;
-//    vec4 viewPos = gbufferProjectionInverse * ndcPos;
-//    viewPos /= viewPos.w;
-//    vec4 worldPos = gbufferModelViewInverse * viewPos;
-//
-//    worldPos /= worldPos.w;
 
-    // if the fragment is in front of the far plane, that means
-    // it is the sky, so we don't need to do shadow test
-//    if (screenSpaceDepth < 1.0) {
-//        color *= visibility(worldPos, shadow, shadowLightPosition, shadowModelView, shadowProjection);
-//    }
-
-//    float k = SHADOW_DISTORT_FACTOR;
-//    vec4 debugColor = vec4(k, k, k, 1.0);
+    color.rgb += blooming(texcoord, 15);
 
     gl_FragData[0] = color;
 }
