@@ -23,24 +23,10 @@ vec4 getBloomOriginColor(vec4 color) {
     return color;
 }
 
-vec3 blooming(vec2 texcoord, int radius) {
-    vec3 sum = vec3(0);
-
-    for(int i=-radius; i<=radius; i++) {
-        for(int j=-radius; j<=radius; j++) {
-            vec2 offset = vec2(i/viewWidth, j/viewHeight);
-            sum += getBloomOriginColor(texture2D(texture, texcoord.st+offset)).rgb;
-        }
-    }
-
-    sum /= pow(radius+1, 2);
-    return sum*0.3;
-}
-
 void main() {
     vec4 color = texture2D(texture, texcoord);
 
-    color.rgb += blooming(texcoord, 15);
-
     gl_FragData[0] = color;
+    // write bright color to channel 1, for blooming
+    gl_FragData[1] = getBloomOriginColor(color);
 }
