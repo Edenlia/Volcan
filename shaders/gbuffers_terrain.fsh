@@ -1,5 +1,9 @@
 #version 120
 
+// set color buffer2 to R32F format, only use R channel
+const int R32F = 114;
+const int colortex2Format = R32F;
+
 uniform sampler2D lightmap;
 uniform sampler2D texture;
 uniform sampler2D shadow;
@@ -21,11 +25,13 @@ uniform float near;
 varying vec2 lmcoord;
 varying vec2 texcoord;
 varying vec4 glcolor;
+varying float blockId;
 varying vec3 viewNormal;
 varying vec4 worldPosition;
 
 #include "/visibility.glsl"
 
+/* DRAWBUFFERS:02 */
 void main() {
 	vec4 color = texture2D(texture, texcoord) * glcolor;
 	vec4 worldPos = worldPosition;
@@ -35,6 +41,6 @@ void main() {
 
 	color *= texture2D(lightmap, lm);
 
-/* DRAWBUFFERS:0 */
 	gl_FragData[0] = color; //gcolor
+	gl_FragData[1] = vec4(blockId); //blockId
 }
