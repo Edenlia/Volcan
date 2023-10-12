@@ -15,7 +15,7 @@ vec4 getScale(sampler2D src, vec2 pos, vec2 anchor, int fact) {
     if(newCoord.x<0 || newCoord.x>1 || newCoord.y<0 || newCoord.y>1) {
         return vec4(0, 0, 0, 1);
     }
-    // 模糊
+    // blur
     vec4 sum = texture2D(src, newCoord);
     int radius = 3;
     for(int i=0; i<radius; i++) {
