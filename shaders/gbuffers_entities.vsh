@@ -14,10 +14,8 @@ void main() {
 	lmcoord  = (gl_TextureMatrix[1] * gl_MultiTexCoord1).xy;
 	glcolor = gl_Color;
 	viewNormal = gl_NormalMatrix * gl_Normal;
-	// TODO: Understand the space of gl_Vertex and gbufferModelViewSpace
-	// The space of gl_Vertex is strange,
-	// if multiply gl_ModelViewMatrix, it can be changed to view space.
-	// But if multiply gbufferModelViewMatrix that will be wrong.
-	// Should know the difference between gl_ModelViewMatrix and gbufferModelViewMatrix.
+	// When a view pos multiply a gbufferModelViewInverse, it won't be changed to
+	// world space, but a world space that set camera at origin.
+	// Each worldPosition calculate in shadow map is in that space.
 	worldPosition = gbufferModelViewInverse * gl_ModelViewMatrix * gl_Vertex;
 }

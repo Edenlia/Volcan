@@ -18,6 +18,7 @@ vec3 calcSkyColor(vec3 pos) {
 	return mix(skyColor, fogColor, fogify(max(upDot, 0.0), 0.25));
 }
 
+/* DRAWBUFFERS:0 */
 void main() {
 	vec3 color;
 	if (starData.a > 0.5) {
@@ -29,6 +30,5 @@ void main() {
 		color = calcSkyColor(normalize(pos.xyz));
 	}
 
-/* DRAWBUFFERS:0 */
 	gl_FragData[0] = vec4(color, 1.0); //gcolor
 }
