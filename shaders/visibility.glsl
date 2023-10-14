@@ -69,7 +69,7 @@ float calPenumbraSize(float objDepth, float blockerDepth) {
     return (objDepth - blockerDepth) / blockerDepth;
 }
 
-float useShadowMap(sampler2D shadowMap, vec4 ndcPos, float objDepth, vec3 lightDir, vec3 normal) {
+float useShadowMap(sampler2D shadowMap, vec4 ndcPos, float objDepth, vec3 lightDir, vec3 normal, float shadowStrength) {
     // The fish eye function applied in ndc space, so we need to
     // change the ndcPos to fish eye coord first and then change
     // the range from [-1, 1] to [0, 1]
@@ -89,11 +89,11 @@ float useShadowMap(sampler2D shadowMap, vec4 ndcPos, float objDepth, vec3 lightD
     if (objDepth - shadowMapDepth <= bias) {
         return 1.0;
     } else {
-        return SHADOW_BRIGHTNESS;
+        return shadowStrength;
     }
 }
 
-float PCF(sampler2D shadowMap, vec4 ndcPos, float objDepth, vec3 lightDir, vec3 normal) {
+float PCF(sampler2D shadowMap, vec4 ndcPos, float objDepth, vec3 lightDir, vec3 normal, float shadowStrength) {
     // Set random seed
     vec2 uv = shadowDistort(ndcPos.xy) * 0.5 + 0.5;
     poissonDiskSamples(uv);
@@ -126,7 +126,7 @@ float PCF(sampler2D shadowMap, vec4 ndcPos, float objDepth, vec3 lightDir, vec3 
 
     visible /= numSample;
 
-    return (1 - SHADOW_BRIGHTNESS) * visible + SHADOW_BRIGHTNESS; // visibility is [SHAODW_STRENGTH, 1]
+    return (1 - shadowStrength) * visible + shadowStrength; // visibility is [shadowStrength, 1]
 }
 
 float findBlocker(
@@ -188,7 +188,8 @@ float PCSS(
         float far,
         float near,
         vec3 lightDir,
-        vec3 normal) {
+        vec3 normal,
+        float shadowStrength) {
     // Set random seed
     vec2 uv = shadowDistort(ndcPos.xy) * 0.5 + 0.5;
     poissonDiskSamples(uv);
@@ -246,11 +247,11 @@ float PCSS(
 //        return 0.0;
 //    }
 
-    return (1 - SHADOW_BRIGHTNESS) * visible + SHADOW_BRIGHTNESS; // visibility is [SHAODW_STRENGTH, 1]
+    return (1 - shadowStrength) * visible + shadowStrength; // visibility is [shadowStrength, 1]
 }
 
 
-// find the visibility of pos, ranged in [SHADOW_BRIGHTNESS, 1]
+// find the visibility of pos, ranged in [shadowStrength, 1]
 // using shadow map.
 float visibility(vec4 worldPos,
 sampler2D shadowMap,
@@ -260,7 +261,8 @@ mat4 shadowProjectionMatrix,
 mat4 shadowProjectionInverseMatrix,
 vec3 viewSpaceNormal,
 float far,
-float near
+float near,
+float shadowStrength
 ) {
     // compute cos between light direction and vertex normal in eye space
     // shadowLightPosition is in eye space, gl_Normal is vertex normal in
@@ -271,7 +273,7 @@ float near
     vec3 normal = normalize(viewSpaceNormal);
     float cosLN = dot(lightDir, normal);
     if (cosLN < 0.0) {
-        return SHADOW_BRIGHTNESS;
+        return shadowStrength;
     }
 
     // from world space to light's clip space
@@ -281,7 +283,7 @@ float near
 
     float objDepth = ndcPos.z * 0.5 + 0.5;
 
-//    return useShadowMap(shadowMap, ndcPos, objDepth, lightDir, normal);
-//    return PCF(shadowMap, ndcPos, objDepth, lightDir, normal);
-    return PCSS(shadowMap, ndcPos, objDepth, shadowProjectionInverseMatrix, far, near, lightDir, normal);
+//    return useShadowMap(shadowMap, ndcPos, objDepth, lightDir, normal, shadowStrength);
+//    return PCF(shadowMap, ndcPos, objDepth, lightDir, normal, shadowStrength);
+    return PCSS(shadowMap, ndcPos, objDepth, shadowProjectionInverseMatrix, far, near, lightDir, normal, shadowStrength);
 }

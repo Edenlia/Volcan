@@ -30,53 +30,27 @@ float fresnel(vec3 I, vec3 N, float ior) {
 	return f0 + (1.0 - f0) * pow(1.0 - cos, 5.0);
 }
 
-vec3 getWave(vec3 color, vec4 trueWorldPos) {
-	// small wave
-	float speed1 = float(worldTime) / (noiseTextureResolution * 15);
-	vec3 coord1 = trueWorldPos.xyz / noiseTextureResolution;
-	coord1.x *= 3;
-	coord1.x += speed1;
-	coord1.z += speed1 * 0.2;
-	float noise1 = texture2D(noisetex, coord1.xz).x;
-
-	// mixed wave
-	float speed2 = float(worldTime) / (noiseTextureResolution * 7);
-	vec3 coord2 = trueWorldPos.xyz / noiseTextureResolution;
-	coord2.x *= 0.5;
-	coord2.x -= speed2 * 0.15 + noise1 * 0.05;  // 加入第一个波浪的噪声
-	coord2.z -= speed2 * 0.7 - noise1 * 0.05;
-	float noise2 = texture2D(noisetex, coord2.xz).x;
-
-	// draw brightness
-	color *= noise2 * 0.6 + 0.4;    // 0.4 - 1.0
-
-	return color;
-}
-
-
-/* DRAWBUFFERS:0 */
+/* DRAWBUFFERS:04 */
 void main() {
-	// if not water, just draw the texture
-	if(!isBlockId(blockId, 10091)) {
+
+	if(!isBlockId(blockId, 10091)) { // if not water, just draw the texture
 		vec4 color = texture2D(texture, texcoord) * glcolor;
 		color *= texture2D(lightmap, lmcoord);
+		vec3 n = normalize(viewNormal);
 		gl_FragData[0] = color;
-		return;
+		gl_FragData[1] = vec4(n * 0.5 + 0.5, 0.5); // view space normal, if this is other transparent block, w=0.5
 	}
+	else {
+		vec3 wi = normalize(-viewPosition.xyz);
+		vec3 n = normalize(viewNormal);
+		float ior = 0.08;
 
-	vec4 trueWorldPos = gbufferModelViewInverse * viewPosition;
-	trueWorldPos.xyz += cameraPosition;
+		float a = fresnel(wi, n, ior);
 
-	vec3 wi = normalize(-viewPosition.xyz);
-	vec3 n = normalize(viewNormal);
-	float ior = 0.08;
-
-	float a = fresnel(wi, n, ior);
-
-	vec4 color = vec4(0.1, 0.2, 0.4, 1.0);
-	color *= texture2D(lightmap, lmcoord);
-	color.w = a;
-	color.xyz = getWave(color.xyz, trueWorldPos);
-
-	gl_FragData[0] = color; //gcolor
+		vec4 color = vec4(0.1, 0.2, 0.4, 1.0);
+		color *= texture2D(lightmap, lmcoord);
+		color.w = a;
+		gl_FragData[0] = color; //gcolor
+		gl_FragData[1] = vec4(n * 0.5 + 0.5, 1.0); // view space normal, if this is water, w=1
+	}
 }
