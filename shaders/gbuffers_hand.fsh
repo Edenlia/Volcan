@@ -3,6 +3,7 @@
 uniform sampler2D lightmap;
 uniform sampler2D texture;
 uniform sampler2D shadow;
+uniform sampler2D shadowtex1;
 
 uniform mat4 gbufferModelView;
 uniform mat4 gbufferModelViewInverse;
@@ -31,8 +32,8 @@ void main() {
 	vec4 worldPos = worldPosition;
 	vec2 lm = lmcoord;
 
-	lm.y *= visibility(worldPos, shadow, shadowLightPosition, shadowModelView,
-						shadowProjection, shadowProjectionInverse, viewNormal, far, near, DEFAULT_SHADOW_STRENGTH);
+	lm.y *= visibility(worldPos, shadowtex1, shadowLightPosition, shadowModelView,
+						shadowProjection, shadowProjectionInverse, viewNormal, far, near, DEFAULT_SHADOW_BRIGHTNESS);
 
 	color *= texture2D(lightmap, lm);
 

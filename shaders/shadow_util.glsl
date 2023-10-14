@@ -1,7 +1,7 @@
 #define SHADOW_DISTORT_ENABLED //Toggles shadow map distortion
 #define SHADOW_DISTORT_FACTOR 0.15 //Distortion factor for the shadow map. Has no effect when shadow distortion is disabled.
 #define SHADOW_BIAS 0.80 //Increase this if you get shadow acne. Decrease this if you get peter panning.
-#define DEFAULT_SHADOW_STRENGTH .75 // the visibility range [DEFAULT_SHADOW_STRENGTH, 1.0]
+#define DEFAULT_SHADOW_BRIGHTNESS .75 // the visibility range [DEFAULT_SHADOW_BRIGHTNESS, 1.0]
 #define LIGHT_RADIUS .015
 #define PI 3.141592653589793
 #define PI2 6.283185307179586

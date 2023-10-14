@@ -1,27 +1,41 @@
 #version 120
 
 const int noiseTextureResolution = 128;
-uniform mat4 gbufferModelView;
-uniform mat4 gbufferModelViewInverse;
-uniform mat4 gbufferProjectionInverse;
 uniform sampler2D noisetex;
 uniform vec3 cameraPosition;
 
 uniform sampler2D texture;
 uniform sampler2D depthtex0; // depth with water
 uniform sampler2D depthtex1; // depth without water
-uniform sampler2D shadow;
 uniform sampler2D gcolor;
+uniform sampler2D shadow;
+uniform sampler2D shadowtex1;
 uniform sampler2D colortex2;
 uniform sampler2D colortex3;
 uniform sampler2D colortex4;
 
+uniform mat4 gbufferModelView;
+uniform mat4 gbufferModelViewInverse;
+uniform mat4 gbufferProjection;
+uniform mat4 gbufferProjectionInverse;
+
+uniform mat4 shadowModelView;
+uniform mat4 shadowModelViewInverse;
+uniform mat4 shadowProjection;
+uniform mat4 shadowProjectionInverse;
+uniform vec3 shadowLightPosition; // shadow light (sun or moon) position in eye space
+
 uniform float viewWidth;    // screen width in pixels
 uniform float viewHeight;   // screen height in pixels
+
+uniform float far; // around 225
+uniform float near;
 
 uniform int worldTime;
 
 varying vec2 texcoord; // x,y is screen space coords, [0, 1]
+
+#include "/visibility.glsl"
 
 vec4 getBloomOriginColor(vec4 color) {
     // grey value
@@ -111,8 +125,18 @@ void main() {
     float isWater = temp.w;
     vec4 trueWorldPos = worldPos0 + vec4(cameraPosition, 0);
     if(isWater == 1.0) {
+        float viewDepth0 = calViewSpaceDepth(depth0 * 2 - 1, far, near);
+        float viewDepth1 = calViewSpaceDepth(depth1 * 2 - 1, far, near);
+
+        vec3 wi = normalize(-viewPos1.xyz);
+        vec3 n = normalize(normal);
+        float cos = clamp(dot(wi, n), 0.0, 1.0);
+
+        float shadowBrightness = clamp((viewDepth1 - viewDepth0) * cos, 0, 1);
+
         color.xyz = drawWaterWave(color.xyz, trueWorldPos, viewPos0, normal);
-//        color = vec4(1.0);
+        color.xyz *= visibility(worldPos1, shadowtex1, shadowLightPosition, shadowModelView,
+                    shadowProjection, shadowProjectionInverse, normal, far, near, shadowBrightness);
     }
 
 
