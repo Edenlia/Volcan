@@ -50,7 +50,7 @@ bool isBlockId(float entityId, int blockId) {
     return abs(entityId - float(blockId)) < 0.03; // rounding error
 }
 
-vec3 getWave(vec3 color, vec4 trueWorldPos) {
+float getWave(vec4 trueWorldPos) {
     // small wave
     float speed1 = float(worldTime) / (noiseTextureResolution * 15);
     vec3 coord1 = trueWorldPos.xyz / noiseTextureResolution;
@@ -67,18 +67,69 @@ vec3 getWave(vec3 color, vec4 trueWorldPos) {
     coord2.z -= speed2 * 0.7 - noise1 * 0.05;
     float noise2 = texture2D(noisetex, coord2.xz).x;
 
-    // draw brightness
-    color *= noise2 * 0.4 + 0.6;    // 0.6 - 1.0
-
-    return color;
+    return noise2 * 0.4 + 0.6;    // 0.6 - 1.0
 }
 
-vec3 drawWaterWave(vec3 color, vec4 trueWorldPos, vec4 viewPos, vec3 viewNormal) {
-//    trueWorldPos.xyz += cameraPosition;
-    color.xyz = getWave(color.xyz, trueWorldPos);
+vec3 rayTrace(vec3 startPoint, vec3 direction) {
+    // A bug causes reflections near the player to mess up. This (for an unknown reason) happens when vieReflection.z is positive
+//    if (direction.z > 0) {
+//        return vec3(0);
+//    }
 
-    return color;
+    vec3 point = startPoint;    // current point
+
+    // 20 iterations
+    int iteration = 100;
+    for(int i=0; i<iteration; i++) {
+        point += direction * 0.2;   // 0.1 is step length
+
+        // view space -> screen space
+        vec4 ndcPos = gbufferProjection * vec4(point, 1.0);
+        ndcPos.xyz /= ndcPos.w;
+        vec2 uv = ndcPos.xy*0.5 + 0.5;
+
+        // beyond screen
+        if (uv.x<0 || uv.x>1 ||
+            uv.y<0 || uv.y>1) {
+            return vec3(0);
+        }
+
+        float shadowMapDepth = texture2D(depthtex0, uv).x;
+        float hitDepth = (ndcPos.z+1.0)*0.5;
+
+        float depthTolerance = 0.0002;    // 0.01 is a good value
+
+        // hit!
+        if(shadowMapDepth < hitDepth && hitDepth > 0.56 && hitDepth < 1 && abs(shadowMapDepth - hitDepth) < depthTolerance) {
+            return texture2D(texture, uv).rgb;
+        }
+    }
+
+    return vec3(0);
 }
+
+vec3 drawWater(vec3 color, vec4 trueWorldPos, vec4 viewPos0, vec4 viewPos1, vec3 viewNormal, vec2 uv) {
+    float wave = getWave(trueWorldPos);
+
+    vec3 finalColor = color;
+    finalColor *= wave;
+
+    vec3 n = viewNormal;
+    n.z += 0.05 * (((wave-0.4)/0.6) * 2 - 1);
+    n = normalize(n);
+    vec3 wi = normalize(-viewPos0.xyz);
+    float cos = clamp(dot(wi, n), 0.0, 1.0);
+    vec3 wo = 2 * cos * n - wi;
+
+    vec3 reflectColor = rayTrace(viewPos0.xyz, wo);
+        if(length(reflectColor)>0) {
+            float fadeFactor = 1 - clamp(pow(abs(uv.x-0.5)*2, 2), 0, 1);
+            finalColor = mix(finalColor, reflectColor, fadeFactor);
+        }
+
+    return finalColor;
+}
+
 
 /* DRAWBUFFERS: 01 */
 void main() {
@@ -131,10 +182,12 @@ void main() {
         vec3 wi = normalize(-viewPos1.xyz);
         vec3 n = normalize(normal);
         float cos = clamp(dot(wi, n), 0.0, 1.0);
+        vec3 wo = 2 * cos * n - wi;
 
-        float shadowBrightness = clamp((viewDepth1 - viewDepth0) * cos, 0, 1);
+        color.xyz = drawWater(color.xyz, trueWorldPos, viewPos0, viewPos1, normal, texcoord);
 
-        color.xyz = drawWaterWave(color.xyz, trueWorldPos, viewPos0, normal);
+        float shadowBrightness = clamp((viewDepth1 - viewDepth0) * cos, 0.75, 1);
+
         color.xyz *= visibility(worldPos1, shadowtex1, shadowLightPosition, shadowModelView,
                     shadowProjection, shadowProjectionInverse, normal, far, near, shadowBrightness);
     }

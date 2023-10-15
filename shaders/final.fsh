@@ -15,9 +15,9 @@ vec4 getScaleInverse(sampler2D src, vec2 pos, vec2 anchor, int fact) {
 }
 
 vec3 exposure(vec3 color, float factor) {
-    float skylight = float(eyeBrightnessSmooth.y)/240;
-    skylight = pow(skylight, 6.0) * factor + (1.0f-factor);
-    return color / skylight;
+    float eyeLight = float(max(eyeBrightnessSmooth.y, eyeBrightnessSmooth.x))/240;
+    eyeLight = pow(eyeLight, 6.0) * factor + (1.0f-factor);
+    return color / eyeLight;
 }
 
 vec3 ACESToneMapping(vec3 color, float adapted_lum) {
