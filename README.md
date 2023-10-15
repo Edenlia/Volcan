@@ -8,8 +8,8 @@ This project is aimed to learn OpenGL pipeline and some real time rendering tech
 
 PCSS (Percentage-Closer Soft Shadows)
 
-![pcss](.\imgs\pcss.png)
+![pcss](./imgs/pcss.png)
 
 Blooming
 
-![blooming](.\imgs\blooming.png)
+![blooming](./imgs/blooming.png)
