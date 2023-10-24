@@ -10,6 +10,10 @@ uniform float viewHeight;
 
 varying vec4 texcoord;
 
+//////////////////////////////////////////////////////////////////////////////
+//                               BLOOMING 1
+//////////////////////////////////////////////////////////////////////////////
+
 vec4 getScale(sampler2D src, vec2 pos, vec2 anchor, int fact) {
     vec2 newCoord = (pos - anchor) * pow(2, fact);
     if(newCoord.x<0 || newCoord.x>1 || newCoord.y<0 || newCoord.y>1) {
