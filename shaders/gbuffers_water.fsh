@@ -30,7 +30,7 @@ float fresnel(vec3 I, vec3 N, float ior) {
 	return f0 + (1.0 - f0) * pow(1.0 - cos, 5.0);
 }
 
-/* DRAWBUFFERS:04 */
+/* DRAWBUFFERS:02 */
 void main() {
 
 	if(!isBlockId(blockId, 10091)) { // if not water, just draw the texture

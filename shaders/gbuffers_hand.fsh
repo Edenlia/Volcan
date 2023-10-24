@@ -37,6 +37,9 @@ void main() {
 
 	color *= texture2D(lightmap, lm);
 
-	/* DRAWBUFFERS:0 */
+	vec3 normal = normalize(viewNormal);
+
+	/* DRAWBUFFERS:02 */
 	gl_FragData[0] = color; //gcolor
+	gl_FragData[1] = vec4(normal * 0.5 + 0.5, 0.0); //gnormal
 }

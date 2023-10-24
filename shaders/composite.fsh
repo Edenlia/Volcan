@@ -10,9 +10,9 @@ uniform sampler2D depthtex1; // depth without water
 uniform sampler2D gcolor;
 uniform sampler2D shadow;
 uniform sampler2D shadowtex1;
-uniform sampler2D colortex2;
+uniform sampler2D colortex2; // view space normal (* 0.5 + 0.5), w: isWater
 uniform sampler2D colortex3;
-uniform sampler2D colortex4;
+uniform sampler2D colortex4; // block id
 
 uniform mat4 gbufferModelView;
 uniform mat4 gbufferModelViewInverse;
@@ -136,7 +136,7 @@ void main() {
     vec4 color = texture2D(texture, texcoord);
     vec4 bloom = color;
 
-    float id = texture2D(colortex2, texcoord).x;
+    float id = texture2D(colortex4, texcoord).x;
 
     // emissive objects
     if(isBlockId(id, 10089)) {
@@ -171,7 +171,7 @@ void main() {
     viewPos1 /= viewPos1.w;
     vec4 worldPos1 = gbufferModelViewInverse * viewPos1;
 
-    vec4 temp = texture2D(colortex4, texcoord);
+    vec4 temp = texture2D(colortex2, texcoord);
     vec3 normal = temp.xyz * 2 - 1;
     float isWater = temp.w;
     vec4 trueWorldPos = worldPos0 + vec4(cameraPosition, 0);
