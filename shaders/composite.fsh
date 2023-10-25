@@ -173,9 +173,9 @@ void main() {
 
     vec4 temp = texture2D(colortex2, texcoord);
     vec3 normal = temp.xyz * 2 - 1;
-    float isWater = temp.w;
+    bool isWater = id > 10091; // TODO: check why id is not 10091 but something bigger
     vec4 trueWorldPos = worldPos0 + vec4(cameraPosition, 0);
-    if(isWater == 1.0) {
+    if(isWater) {
         float viewDepth0 = calViewSpaceDepth(depth0 * 2 - 1, far, near);
         float viewDepth1 = calViewSpaceDepth(depth1 * 2 - 1, far, near);
 

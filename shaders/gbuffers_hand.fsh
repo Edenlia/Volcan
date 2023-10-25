@@ -27,6 +27,7 @@ varying vec4 worldPosition;
 
 #include "/visibility.glsl"
 
+/* DRAWBUFFERS:02 */
 void main() {
 	vec4 color = texture2D(texture, texcoord) * glcolor;
 	vec4 worldPos = worldPosition;
@@ -36,10 +37,9 @@ void main() {
 						shadowProjection, shadowProjectionInverse, viewNormal, far, near, DEFAULT_SHADOW_BRIGHTNESS);
 
 	color *= texture2D(lightmap, lm);
+	vec3 n = normalize(viewNormal);
+//	n = vec3(999,999,999);
 
-	vec3 normal = normalize(viewNormal);
-
-	/* DRAWBUFFERS:02 */
 	gl_FragData[0] = color; //gcolor
-	gl_FragData[1] = vec4(normal * 0.5 + 0.5, 0.0); //gnormal
+	gl_FragData[1] = vec4(n * 0.5 + 0.5, 1.0); //gnormal
 }

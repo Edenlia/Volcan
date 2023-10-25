@@ -3,6 +3,7 @@
 uniform sampler2D colortex0;
 uniform sampler2D colortex1;
 uniform sampler2D colortex2;
+uniform sampler2D colortex4;
 
 uniform int worldTime;
 
@@ -36,7 +37,8 @@ void main() {
 //    color.rgb = ACESToneMapping(color.rgb, 1);
     gl_FragData[0] = color;
 
-//    vec4 testColor = texture2D(colortex2, texcoord.st);
-//    testColor = vec4(testColor.xyz * 2 - 1 , 1);
+//    vec4 testColor = vec4(texture2D(colortex4, texcoord.st).x - 10092);
+//////    testColor = vec4(testColor.xyz * 2 - 1 , 1);
+//////    testColor = vec4(testColor.w);
 //    gl_FragData[0] = testColor;
 }

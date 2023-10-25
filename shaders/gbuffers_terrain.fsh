@@ -46,6 +46,6 @@ void main() {
 	vec3 n = normalize(viewNormal);
 
 	gl_FragData[0] = color; //gcolor
-	gl_FragData[1] = vec4(n * 0.5 + 0.5, 0.0); //blockId
+	gl_FragData[1] = vec4(n * 0.5 + 0.5, 1.0); //normal
 	gl_FragData[2] = vec4(blockId); //blockId
 }

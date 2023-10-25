@@ -55,6 +55,7 @@ void uniformDiskSamples(const in vec2 randomSeed) {
 }
 
 // Refer to https://zhuanlan.zhihu.com/p/128028758
+// return [near, far]
 float calViewSpaceDepth(float ndcDepth, float far, float near) {
     return 2 * near * far / ((far + near) - ndcDepth * (far - near));
 }
